@@ -1,0 +1,255 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/GaelAriel/Algoritmia-y-Optimizaci-n/blob/main/proyecto_final_hh_tsp.ipynb/PIA_Algoritmia\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "aef0b982",
+      "metadata": {
+        "id": "aef0b982"
+      },
+      "source": [
+        "# Proyecto final: Hiper-heurística de selección para TSP\n",
+        "\n",
+        "\n",
+        "1. **Preparación:** verifica que el dataset esté disponible.\n",
+        "2. **Pruebas automáticas** de los algoritmos.\n",
+        "3. **Parte 1:** corre 2-opt hill climbing, SA + 2-opt y MST + 2-opt sobre las 500 instancias y genera las etiquetas.\n",
+        "4. **Parte 2:** entrena el clasificador, lo evalúa en el conjunto de prueba y genera tablas y figuras.\n",
+        "5. **Resultados:** muestra el resumen y las gráficas.\n",
+        "\n",
+        "**Antes de ejecutar:** el repositorio debe estar clonado o subido a Colab (con la carpeta `codigo/`) y se debe tener a la mano `hh_tsp_dataset.zip`"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "2a997c91",
+      "metadata": {
+        "id": "2a997c91"
+      },
+      "source": [
+        "## 1. Preparación del dataset"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "b0cec741",
+      "metadata": {
+        "id": "b0cec741"
+      },
+      "outputs": [],
+      "source": [
+        "import os\n",
+        "import subprocess\n",
+        "\n",
+        "if not os.path.isdir(\"hh_tsp_dataset/data\"):\n",
+        "    if not os.path.exists(\"hh_tsp_dataset.zip\"):\n",
+        "        try:\n",
+        "            from google.colab import files\n",
+        "            print(\"Sube el archivo hh_tsp_dataset.zip\")\n",
+        "            files.upload()\n",
+        "        except ImportError:\n",
+        "            raise FileNotFoundError(\"Coloca hh_tsp_dataset.zip (o la carpeta hh_tsp_dataset/) junto a este cuaderno.\")\n",
+        "    subprocess.run([\"unzip\", \"-q\", \"-n\", \"hh_tsp_dataset.zip\"], check=True)\n",
+        "\n",
+        "assert os.path.isdir(\"codigo\"), \"Falta la carpeta codigo/ del repositorio\"\n",
+        "assert os.path.isfile(\"hh_tsp_dataset/data/train.csv\"), \"No se encontro hh_tsp_dataset/data/train.csv\"\n",
+        "print(\"Dataset y codigo listos.\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "32932d32",
+      "metadata": {
+        "id": "32932d32"
+      },
+      "source": [
+        "### Parámetros (opcional)\n",
+        "\n",
+        "Los valores por defecto están en `codigo/config.py`. Para cambiar los del recocido simulado sin editar el código, descomentar y\n",
+        "ajustar estas líneas **antes** de ejecutar la Parte 1 (y volver a ejecutarla desde ahí):"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "14fb8a78",
+      "metadata": {
+        "id": "14fb8a78"
+      },
+      "outputs": [],
+      "source": [
+        "# os.environ[\"HH_SA_FACTOR\"] = \"5\"      # iteraciones del SA = factor * n^2   (por defecto 5)\n",
+        "# os.environ[\"HH_SA_MIN_ITER\"] = \"300\"  # minimo de iteraciones                (por defecto 300)\n",
+        "# os.environ[\"HH_SA_T0\"] = \"0.14\"       # temperatura inicial                  (por defecto 0.14)\n",
+        "# os.environ[\"HH_SA_TF\"] = \"0.001\"      # temperatura final                    (por defecto 0.001)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "8fb5218d",
+      "metadata": {
+        "id": "8fb5218d"
+      },
+      "source": [
+        "## 2. Pruebas automáticas de los algoritmos"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "a3610633",
+      "metadata": {
+        "id": "a3610633"
+      },
+      "outputs": [],
+      "source": [
+        "!python codigo/pruebas_algoritmos.py"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "f1144739",
+      "metadata": {
+        "id": "f1144739"
+      },
+      "source": [
+        "## 3. Parte 1: generar las etiquetas\n",
+        "\n",
+        "Corre los tres algoritmos sobre cada instancia de `train.csv` y `test.csv` y escribe `resultados/train_etiquetado.csv` y\n",
+        "`resultados/test_etiquetado.csv`, además del balance de clases y los parámetros utilizados. Si Colab se desconecta, basta con\n",
+        "volver a ejecutar esta celda: retoma desde la última instancia calculada."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "66595198",
+      "metadata": {
+        "id": "66595198"
+      },
+      "outputs": [],
+      "source": [
+        "!python codigo/01_generar_etiquetas.py"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "d8fa36c6",
+      "metadata": {
+        "id": "d8fa36c6"
+      },
+      "source": [
+        "## 4. Parte 2: entrenamiento y evaluación del clasificador\n",
+        "\n",
+        "Selecciona modelo e hiperparámetros con validación cruzada (solo con entrenamiento) y evalúa en prueba: accuracy contra el\n",
+        "baseline, matriz de confusión, regret, importancia de características y patrones por distribución y tamaño. Tarda unos minutos."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "9963ba45",
+      "metadata": {
+        "id": "9963ba45"
+      },
+      "outputs": [],
+      "source": [
+        "!python codigo/02_entrenar_evaluar.py"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "bd7a6177",
+      "metadata": {
+        "id": "bd7a6177"
+      },
+      "source": [
+        "## 5. Resultados"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "68548873",
+      "metadata": {
+        "id": "68548873"
+      },
+      "outputs": [],
+      "source": [
+        "from IPython.display import Markdown, display\n",
+        "\n",
+        "with open(\"resultados/resumen_resultados.md\") as f:\n",
+        "    display(Markdown(f.read()))"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "21a63450",
+      "metadata": {
+        "id": "21a63450"
+      },
+      "outputs": [],
+      "source": [
+        "from IPython.display import Image, display\n",
+        "\n",
+        "for nombre in [\"fig_balance_clases\", \"fig_matriz_confusion\", \"fig_regret\", \"fig_importancia_caracteristicas\",\n",
+        "               \"fig_patrones_ganador\", \"fig_arbol_decision\"]:\n",
+        "    display(Image(filename=f\"resultados/{nombre}.png\"))"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "023e723e",
+      "metadata": {
+        "id": "023e723e"
+      },
+      "source": [
+        "## 6. Archivos generados\n",
+        "\n",
+        "Todo queda en la carpeta `resultados/`."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "4ef82151",
+      "metadata": {
+        "id": "4ef82151"
+      },
+      "outputs": [],
+      "source": [
+        "# import shutil\n",
+        "# shutil.make_archive(\"resultados\", \"zip\", \"resultados\")\n",
+        "# from google.colab import files\n",
+        "# files.download(\"resultados.zip\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python"
+    },
+    "colab": {
+      "provenance": [],
+      "include_colab_link": true
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
